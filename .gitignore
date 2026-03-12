@@ -76,3 +76,8 @@ private/
 mcp_servers.json
 
 .vscode/
+
+# RAG memory & runtime data
+rag_memory_db/
+reminders.json
+self_notes.json

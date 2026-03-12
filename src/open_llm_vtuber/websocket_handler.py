@@ -27,6 +27,8 @@ from .conversations.conversation_handler import (
     handle_group_interrupt,
     handle_individual_interrupt,
 )
+from .reminder_scheduler import ReminderScheduler, Reminder, IdleChatScheduler, get_sleepy_state
+from .agent.agents.rag_memory_agent import set_global_reminder_scheduler
 
 
 class MessageType(Enum):
@@ -69,6 +71,11 @@ class WebSocketHandler:
         self.current_conversation_tasks: Dict[str, Optional[asyncio.Task]] = {}
         self.default_context_cache = default_context_cache
         self.received_data_buffers: Dict[str, np.ndarray] = {}
+
+        self.reminder_scheduler = ReminderScheduler(data_dir=".")
+        set_global_reminder_scheduler(self.reminder_scheduler)
+        self.idle_chat_scheduler = IdleChatScheduler()
+        self._schedulers_started = False
 
         # Message handlers mapping
         self._message_handlers = self._init_message_handlers()
@@ -122,6 +129,11 @@ class WebSocketHandler:
             await self._send_initial_messages(
                 websocket, client_uid, session_service_context
             )
+
+            if not self._schedulers_started:
+                self.reminder_scheduler.start(self._on_reminder_due)
+                self.idle_chat_scheduler.start(self._on_idle_chat)
+                self._schedulers_started = True
 
             logger.info(f"Connection established for client {client_uid}")
 
@@ -276,6 +288,134 @@ class WebSocketHandler:
             client_connections=self.client_connections,
             send_group_update=self.send_group_update,
         )
+
+    async def _on_reminder_due(self, reminder: Reminder) -> None:
+        """Called by the scheduler when a reminder is due. Pushes a proactive conversation."""
+        if not self.client_connections:
+            logger.warning("Reminder due but no clients connected, skipping")
+            return
+
+        from .conversations.single_conversation import process_single_conversation
+        from .conversations.conversation_utils import EMOJI_LIST
+
+        client_uid = next(iter(self.client_connections))
+        websocket = self.client_connections[client_uid]
+        context = self.client_contexts.get(client_uid)
+        if not context:
+            logger.warning(f"No context for client {client_uid}, skipping reminder")
+            return
+
+        reminder_prompt = (
+            f"[系统提醒] 现在是提醒时间。用户之前设置了以下提醒: "
+            f"「{reminder.content}」。"
+            f"请用你的角色语气主动提醒用户这件事。不要提到'系统提醒'这几个字，"
+            f"就像你自己记得一样自然地提醒他。"
+        )
+
+        session_emoji = np.random.choice(EMOJI_LIST)
+        metadata = {
+            "proactive_speak": True,
+            "skip_memory": False,
+            "skip_history": False,
+        }
+
+        logger.info(f"Triggering reminder: {reminder.content}")
+
+        try:
+            for attempt in range(120):
+                existing_task = self.current_conversation_tasks.get(client_uid)
+                if existing_task and not existing_task.done():
+                    if attempt == 0:
+                        logger.info("Reminder waiting for current conversation to finish...")
+                    await asyncio.sleep(2)
+                    continue
+
+                if client_uid not in self.client_connections:
+                    logger.warning("Client disconnected while waiting for reminder")
+                    return
+
+                self.current_conversation_tasks[client_uid] = asyncio.create_task(
+                    process_single_conversation(
+                        context=context,
+                        websocket_send=websocket.send_text,
+                        client_uid=client_uid,
+                        user_input=reminder_prompt,
+                        session_emoji=session_emoji,
+                        metadata=metadata,
+                    )
+                )
+                logger.info("Reminder conversation triggered successfully")
+                return
+
+            logger.warning("Reminder gave up after 4 min of waiting")
+        except Exception as e:
+            logger.error(f"Failed to trigger reminder conversation: {e}")
+
+    async def _on_idle_chat(self) -> None:
+        """Called by the idle chat scheduler to initiate a proactive conversation."""
+        if not self.client_connections:
+            return
+
+        from .conversations.single_conversation import process_single_conversation
+        from .conversations.conversation_utils import EMOJI_LIST
+
+        client_uid = next(iter(self.client_connections))
+        websocket = self.client_connections[client_uid]
+        context = self.client_contexts.get(client_uid)
+        if not context:
+            return
+
+        existing_task = self.current_conversation_tasks.get(client_uid)
+        if existing_task and not existing_task.done():
+            return
+
+        sleepy = get_sleepy_state()
+        if sleepy == "sleeping":
+            return
+
+        from .agent.agents.rag_memory_agent import RAGMemoryAgent
+        rag_agent = context.agent_engine
+        rag_hint = ""
+        if isinstance(rag_agent, RAGMemoryAgent):
+            memories = rag_agent._rag_store.query("用户最近在做什么 聊过什么", n_results=3)
+            if memories:
+                rag_hint = "参考以下长期记忆来找话题:\n"
+                for m in memories:
+                    rag_hint += f"- ({m['time']}) {m['content']}\n"
+
+        if sleepy == "drowsy":
+            mood = "你现在有点困了，说话慵懒一些。"
+        else:
+            mood = "你心情不错。"
+
+        idle_prompt = (
+            f"[主动搭话] {mood} 请你主动跟用户说点什么，可以是闲聊、吐槽、分享想法、"
+            f"或者关心一下用户。用你的角色语气，自然一些，不要太长。"
+            f"不要提到'主动搭话'这几个字。\n{rag_hint}"
+        )
+
+        session_emoji = np.random.choice(EMOJI_LIST)
+        metadata = {
+            "proactive_speak": True,
+            "skip_memory": False,
+            "skip_history": False,
+        }
+
+        logger.info("IdleChatScheduler: triggering proactive chat")
+
+        try:
+            self.current_conversation_tasks[client_uid] = asyncio.create_task(
+                process_single_conversation(
+                    context=context,
+                    websocket_send=websocket.send_text,
+                    client_uid=client_uid,
+                    user_input=idle_prompt,
+                    session_emoji=session_emoji,
+                    metadata=metadata,
+                )
+            )
+        except Exception as e:
+            logger.error(f"Failed to trigger idle chat: {e}")
 
     async def handle_disconnect(self, client_uid: str) -> None:
         """Handle client disconnection"""
@@ -514,6 +654,7 @@ class WebSocketHandler:
         self, websocket: WebSocket, client_uid: str, data: WSMessage
     ) -> None:
         """Handle triggers that start a conversation"""
+        self.idle_chat_scheduler.record_interaction()
         await handle_conversation_trigger(
             msg_type=data.get("type", ""),
             data=data,

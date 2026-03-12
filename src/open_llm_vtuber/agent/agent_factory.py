@@ -3,6 +3,7 @@ from loguru import logger
 
 from .agents.agent_interface import AgentInterface
 from .agents.basic_memory_agent import BasicMemoryAgent
+from .agents.rag_memory_agent import RAGMemoryAgent
 from .stateless_llm_factory import LLMFactory as StatelessLLMFactory
 from .agents.hume_ai import HumeAIAgent
 from .agents.letta_agent import LettaAgent
@@ -83,6 +84,51 @@ class AgentFactory:
                 tool_manager=tool_manager,
                 tool_executor=tool_executor,
                 mcp_prompt_string=mcp_prompt_string,
+            )
+
+        elif conversation_agent_choice == "rag_memory_agent":
+            rag_settings: dict = agent_settings.get("rag_memory_agent", {})
+            llm_provider: str = rag_settings.get("llm_provider")
+
+            if not llm_provider:
+                raise ValueError("LLM provider not specified for RAG memory agent")
+
+            llm_config: dict = llm_configs.get(llm_provider)
+            interrupt_method: Literal["system", "user"] = llm_config.pop(
+                "interrupt_method", "user"
+            )
+
+            if not llm_config:
+                raise ValueError(
+                    f"Configuration not found for LLM provider: {llm_provider}"
+                )
+
+            llm = StatelessLLMFactory.create_llm(
+                llm_provider=llm_provider, system_prompt=system_prompt, **llm_config
+            )
+
+            tool_prompts = kwargs.get("system_config", {}).get("tool_prompts", {})
+            tool_manager: Optional[ToolManager] = kwargs.get("tool_manager")
+            tool_executor: Optional[ToolExecutor] = kwargs.get("tool_executor")
+            mcp_prompt_string: str = kwargs.get("mcp_prompt_string", "")
+
+            return RAGMemoryAgent(
+                llm=llm,
+                system=system_prompt,
+                live2d_model=live2d_model,
+                tts_preprocessor_config=tts_preprocessor_config,
+                faster_first_response=rag_settings.get("faster_first_response", True),
+                segment_method=rag_settings.get("segment_method", "pysbd"),
+                use_mcpp=rag_settings.get("use_mcpp", False),
+                interrupt_method=interrupt_method,
+                tool_prompts=tool_prompts,
+                tool_manager=tool_manager,
+                tool_executor=tool_executor,
+                mcp_prompt_string=mcp_prompt_string,
+                rag_db_path=rag_settings.get("rag_db_path", "./rag_memory_db"),
+                rag_retention_days=rag_settings.get("rag_retention_days", 14),
+                rag_max_results=rag_settings.get("rag_max_results", 8),
+                max_short_memory=rag_settings.get("max_short_memory", 10),
             )
 
         elif conversation_agent_choice == "mem0_agent":

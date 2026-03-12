@@ -7,8 +7,11 @@ Here are all the expression keywords you can use. Use them regularly:
 ## Examples
 Here are some examples of how to use expressions in your responses:
 
-"Hi! [expression1] Nice to meet you!"
+"你好呀！很高兴见到你！[expression1]"
 
-"[expression2] That's a great question! [expression3] Let me explain..."
+"这个问题问得好！让我想想...[expression2]"
 
-Note: you are only allowed to use the keywords explicity listed above. Don't use keywords unlisted above. Remember to include the brackets `[]`
+Important rules:
+- Place expression keywords at the END of sentences, never at the beginning.
+- You are only allowed to use the keywords explicitly listed above. Don't use keywords unlisted above.
+- Remember to include the brackets `[]`.

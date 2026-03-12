@@ -119,6 +119,57 @@ class Mem0Config(I18nMixin, BaseModel):
 # =================================
 
 
+class RAGMemoryAgentConfig(I18nMixin, BaseModel):
+    """Configuration for the RAG memory agent."""
+
+    llm_provider: Literal[
+        "stateless_llm_with_template",
+        "openai_compatible_llm",
+        "claude_llm",
+        "llama_cpp_llm",
+        "ollama_llm",
+        "lmstudio_llm",
+        "openai_llm",
+        "gemini_llm",
+        "zhipu_llm",
+        "deepseek_llm",
+        "groq_llm",
+        "mistral_llm",
+    ] = Field(..., alias="llm_provider")
+
+    faster_first_response: Optional[bool] = Field(True, alias="faster_first_response")
+    segment_method: Literal["regex", "pysbd"] = Field("pysbd", alias="segment_method")
+    use_mcpp: Optional[bool] = Field(False, alias="use_mcpp")
+    mcp_enabled_servers: Optional[List[str]] = Field([], alias="mcp_enabled_servers")
+    rag_db_path: str = Field("./rag_memory_db", alias="rag_db_path")
+    rag_retention_days: int = Field(14, alias="rag_retention_days")
+    rag_max_results: int = Field(8, alias="rag_max_results")
+    max_short_memory: int = Field(10, alias="max_short_memory")
+
+    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "llm_provider": Description(
+            en="LLM provider to use for this agent",
+            zh="RAG Memory Agent 使用的大语言模型",
+        ),
+        "rag_db_path": Description(
+            en="Path to the ChromaDB database for long-term memory",
+            zh="ChromaDB 长期记忆数据库路径",
+        ),
+        "rag_retention_days": Description(
+            en="Number of days to retain memories (default: 14)",
+            zh="记忆保留天数（默认：14天）",
+        ),
+        "rag_max_results": Description(
+            en="Maximum number of memories to retrieve per query (default: 8)",
+            zh="每次查询检索的最大记忆条数（默认：8）",
+        ),
+        "max_short_memory": Description(
+            en="Maximum conversation turns to keep in working memory (default: 10)",
+            zh="工作记忆中保留的最大对话轮数（默认：10）",
+        ),
+    }
+
+
 class HumeAIConfig(I18nMixin, BaseModel):
     """Configuration for the Hume AI agent."""
 
@@ -178,6 +229,9 @@ class AgentSettings(I18nMixin, BaseModel):
     basic_memory_agent: Optional[BasicMemoryAgentConfig] = Field(
         None, alias="basic_memory_agent"
     )
+    rag_memory_agent: Optional[RAGMemoryAgentConfig] = Field(
+        None, alias="rag_memory_agent"
+    )
     mem0_agent: Optional[Mem0Config] = Field(None, alias="mem0_agent")
     hume_ai_agent: Optional[HumeAIConfig] = Field(None, alias="hume_ai_agent")
     letta_agent: Optional[LettaConfig] = Field(None, alias="letta_agent")
@@ -200,7 +254,7 @@ class AgentConfig(I18nMixin, BaseModel):
     """This class contains all of the configurations related to agent."""
 
     conversation_agent_choice: Literal[
-        "basic_memory_agent", "mem0_agent", "hume_ai_agent", "letta_agent"
+        "basic_memory_agent", "rag_memory_agent", "mem0_agent", "hume_ai_agent", "letta_agent"
     ] = Field(..., alias="conversation_agent_choice")
     agent_settings: AgentSettings = Field(..., alias="agent_settings")
     llm_configs: StatelessLLMConfigs = Field(..., alias="llm_configs")
