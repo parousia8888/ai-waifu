@@ -32,6 +32,7 @@ from ...mcpp.tool_manager import ToolManager
 from ...mcpp.tool_executor import ToolExecutor
 from ...reminder_scheduler import detect_reminder_intent, ReminderScheduler, get_sleepy_state
 from .self_notes import SelfNotes
+from .music_player import MusicPlayer, detect_music_intent, _clean_query
 
 _global_reminder_scheduler: Optional[ReminderScheduler] = None
 
@@ -58,10 +59,10 @@ FILE_PATTERNS = [
 ]
 
 SELF_NOTE_PATTERNS = [
-    re.compile(r"以后(?:要|都|得|请你|你要|你得)?(.+)", re.IGNORECASE),
-    re.compile(r"你(?:以后|之后|今后)(?:要|都|得)?(.+)", re.IGNORECASE),
+    re.compile(r"(?:^|[，,。\s])以后(?:要|都|得|请你|你要|你得)(.+)", re.IGNORECASE),
+    re.compile(r"你(?:以后|之后|今后)(?:要|都|得)(.+)", re.IGNORECASE),
     re.compile(r"(?:不要|别|不许|不准)再(.+)", re.IGNORECASE),
-    re.compile(r"(?:改|改成|换成|调整)(?:一下|为)?(.+)", re.IGNORECASE),
+    re.compile(r"(?:改成|换成|调整为)(.+)", re.IGNORECASE),
 ]
 
 MAX_SHORT_MEMORY = 10
@@ -88,6 +89,7 @@ class RAGMemoryAgent(BasicMemoryAgent):
         rag_retention_days: int = 14,
         rag_max_results: int = 8,
         max_short_memory: int = 10,
+        music_service: str = "netease",
     ):
         super().__init__(
             llm=llm,
@@ -112,11 +114,13 @@ class RAGMemoryAgent(BasicMemoryAgent):
         self._max_short_memory = max_short_memory
         self._original_system = system
         self._self_notes = SelfNotes(data_dir=rag_db_path if os.path.isdir(rag_db_path) else ".")
+        self._music_player = MusicPlayer(service=music_service)
 
         logger.info(
             f"RAGMemoryAgent initialized. "
             f"DB: {rag_db_path}, retention: {rag_retention_days}d, "
             f"short_memory: {max_short_memory} turns, "
+            f"music: {music_service}, "
             f"self_notes: {len(self._self_notes.get_all_notes())}"
         )
 
@@ -164,9 +168,15 @@ class RAGMemoryAgent(BasicMemoryAgent):
 
     def _detect_self_note(self, text: str) -> bool:
         """Detect if user is giving a behavioral instruction and save it."""
+        music_keywords = ["播放", "放一首", "来一首", "我想听", "帮我放"]
+        if any(kw in text for kw in music_keywords):
+            return False
+
         behavioral_keywords = [
-            "以后", "之后", "今后", "不要再", "别再", "不许", "不准",
-            "改成", "换成", "调整", "你要", "你得", "你应该",
+            "以后要", "以后都", "以后得", "以后请", "以后你",
+            "之后要", "之后都", "今后",
+            "不要再", "别再", "不许再", "不准再",
+            "改成", "换成", "调整为",
         ]
         if not any(kw in text for kw in behavioral_keywords):
             return False
@@ -175,11 +185,31 @@ class RAGMemoryAgent(BasicMemoryAgent):
             match = pattern.search(text)
             if match:
                 note_content = text.strip()
+                if len(note_content) < 5 or len(note_content) > 200:
+                    return False
                 result = self._self_notes.add_note(note_content, category="user_instruction")
                 if result == "added":
                     logger.info(f"Self-note saved: {note_content[:60]}")
                     return True
         return False
+
+    def _handle_music_intent(self, text: str) -> Optional[str]:
+        """Detect music intent and execute it. Returns status string or None."""
+        intent = detect_music_intent(text)
+        if not intent:
+            return None
+
+        action = intent["action"]
+        if action == "play":
+            result = self._music_player.search_and_play(intent["query"])
+            logger.info(f"Music play: {intent['query']} -> {result}")
+            return f"[音乐操作] {result}"
+        elif action == "volume":
+            result = self._music_player.set_volume(intent["level"])
+            return f"[音乐操作] {result}"
+        else:
+            result = self._music_player.control_playback(action)
+            return f"[音乐操作] {result}"
 
     def _detect_and_create_reminder(self, text: str) -> Optional[str]:
         """Detect reminder intent and create a scheduled reminder. Returns info string or None."""
@@ -229,6 +259,8 @@ class RAGMemoryAgent(BasicMemoryAgent):
                 else:
                     file_content = f"[无法读取文件: {file_path}]"
 
+        music_info = self._handle_music_intent(text_prompt)
+
         rag_context = self._build_rag_context(text_prompt) if text_prompt else ""
 
         augmented_system = self._original_system
@@ -253,6 +285,8 @@ class RAGMemoryAgent(BasicMemoryAgent):
             augmented_system = f"{augmented_system}\n\n{file_content}"
         if reminder_info:
             augmented_system = f"{augmented_system}\n\n{reminder_info}"
+        if music_info:
+            augmented_system = f"{augmented_system}\n\n{music_info}"
         self.set_system(augmented_system)
 
         self._trim_working_memory()
@@ -282,14 +316,28 @@ class RAGMemoryAgent(BasicMemoryAgent):
 
         return messages
 
+    _AI_PLAY_PATTERN = re.compile(
+        r"(?:^|[\n。！!])播放[：:\s]*([^\n。！!？?\"\"\"、,，]{2,30})(?:[。！!？?\n\[]|$)"
+    )
+
+    def _check_ai_music_command(self, text: str):
+        """If the AI's response contains '播放xxx', trigger actual playback."""
+        match = self._AI_PLAY_PATTERN.search(text)
+        if match:
+            query = _clean_query(match.group(1))
+            if query and len(query) >= 2:
+                result = self._music_player.search_and_play(query)
+                logger.info(f"AI-triggered music play: {query} -> {result}")
+
     def _add_message(self, message, role, display_text=None, skip_memory=False):
         """Override: also store assistant responses to RAG for long-term memory."""
         super()._add_message(message, role, display_text, skip_memory)
 
         if skip_memory:
             return
-        if role == "assistant" and isinstance(message, str) and len(message) > 10:
-            if len(self._memory) >= 2:
+        if role == "assistant" and isinstance(message, str):
+            self._check_ai_music_command(message)
+            if len(message) > 10 and len(self._memory) >= 2:
                 prev = self._memory[-2] if len(self._memory) >= 2 else None
                 if prev and prev.get("role") == "user":
                     self._rag_store.add_conversation_summary(

@@ -129,6 +129,7 @@ class AgentFactory:
                 rag_retention_days=rag_settings.get("rag_retention_days", 14),
                 rag_max_results=rag_settings.get("rag_max_results", 8),
                 max_short_memory=rag_settings.get("max_short_memory", 10),
+                music_service=rag_settings.get("music_service", "netease"),
             )
 
         elif conversation_agent_choice == "mem0_agent":

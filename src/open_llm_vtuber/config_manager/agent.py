@@ -145,6 +145,7 @@ class RAGMemoryAgentConfig(I18nMixin, BaseModel):
     rag_retention_days: int = Field(14, alias="rag_retention_days")
     rag_max_results: int = Field(8, alias="rag_max_results")
     max_short_memory: int = Field(10, alias="max_short_memory")
+    music_service: str = Field("netease", alias="music_service")
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "llm_provider": Description(

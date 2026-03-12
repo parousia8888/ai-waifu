@@ -1899,6 +1899,7 @@ dependencies = [
     { name = "openai" },
     { name = "pre-commit" },
     { name = "pydub" },
+    { name = "pyncm" },
     { name = "pysbd" },
     { name = "pyttsx3" },
     { name = "pyyaml" },
@@ -1915,6 +1916,7 @@ dependencies = [
     { name = "tqdm" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "websocket-client" },
+    { name = "yt-dlp" },
 ]
 
 [package.optional-dependencies]
@@ -1949,6 +1951,7 @@ requires-dist = [
     { name = "openai", specifier = ">=1.57.4" },
     { name = "pre-commit", specifier = ">=4.1.0" },
     { name = "pydub", specifier = ">=0.25.1" },
+    { name = "pyncm", specifier = ">=1.8.1" },
     { name = "pysbd", specifier = ">=0.3.4" },
     { name = "pyttsx3", specifier = ">=2.98" },
     { name = "pyyaml", specifier = ">=6.0.2" },
@@ -1966,6 +1969,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.33.0" },
     { name = "websocket-client", specifier = ">=1.8.0" },
     { name = "yarl", marker = "extra == 'bilibili'", specifier = ">=1.12.0,<2.0" },
+    { name = "yt-dlp", specifier = ">=2026.3.3" },
 ]
 provides-extras = ["bilibili"]
 
@@ -2516,6 +2520,18 @@ wheels = [
 [package.optional-dependencies]
 crypto = [
     { name = "cryptography" },
+]
+
+[[package]]
+name = "pyncm"
+version = "1.8.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/35/1a/30c0dad2969452e6b6d5b65f930d04d8247a3c506bad552ee9b7082336a4/pyncm-1.8.1.tar.gz", hash = "sha256:f967a598d148dbf69ff013f2e669e077764c34997c761a6a4b8f709d06494593", size = 65912, upload-time = "2025-10-18T08:47:50.41Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/f4/05d7a0116bd70dcef0f7214c0e9ee6a50a124525eaefc5c2bb0c5085f0b7/pyncm-1.8.1-py3-none-any.whl", hash = "sha256:839f9f0e534d4892b7b9ad0378f13c4595f900653e11f00d758f1aed957c4374", size = 74032, upload-time = "2025-10-18T08:47:48.618Z" },
 ]
 
 [[package]]
@@ -6119,6 +6135,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/9a/6ad1a9b37c2f72874f93e691b2e7ecb6137fb2b899983125db4204e47575/yarl-1.22.0-cp312-cp312-win_amd64.whl", hash = "sha256:8884d8b332a5e9b88e23f60bb166890009429391864c685e17bd73a9eda9105c", size = 87213, upload-time = "2025-10-06T14:10:11.369Z" },
     { url = "https://files.pythonhosted.org/packages/44/c5/c21b562d1680a77634d748e30c653c3ca918beb35555cff24986fff54598/yarl-1.22.0-cp312-cp312-win_arm64.whl", hash = "sha256:ea70f61a47f3cc93bdf8b2f368ed359ef02a01ca6393916bc8ff877427181e74", size = 81330, upload-time = "2025-10-06T14:10:13.112Z" },
     { url = "https://files.pythonhosted.org/packages/73/ae/b48f95715333080afb75a4504487cbe142cae1268afc482d06692d605ae6/yarl-1.22.0-py3-none-any.whl", hash = "sha256:1380560bdba02b6b6c90de54133c81c9f2a453dee9912fe58c1dcced1edb7cff", size = 46814, upload-time = "2025-10-06T14:12:53.872Z" },
+]
+
+[[package]]
+name = "yt-dlp"
+version = "2026.3.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/66/6f/7427d23609353e5ef3470ff43ef551b8bd7b166dd4fef48957f0d0e040fe/yt_dlp-2026.3.3.tar.gz", hash = "sha256:3db7969e3a8964dc786bdebcffa2653f31123bf2a630f04a17bdafb7bbd39952", size = 3118658, upload-time = "2026-03-03T16:54:53.909Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/a4/8b5cd28ab87aef48ef15e74241befec3445496327db028f34147a9e0f14f/yt_dlp-2026.3.3-py3-none-any.whl", hash = "sha256:166c6e68c49ba526474bd400e0129f58aa522c2896204aa73be669c3d2f15e63", size = 3315599, upload-time = "2026-03-03T16:54:51.899Z" },
 ]
 
 [[package]]

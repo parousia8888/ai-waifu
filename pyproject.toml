@@ -42,6 +42,8 @@ dependencies = [
     "duckduckgo-mcp-server>=0.1.1",
     "fish-audio-sdk>=1.3.0",
     "chromadb>=1.5.5",
+    "pyncm>=1.8.1",
+    "yt-dlp>=2026.3.3",
 ]
 
 [project.optional-dependencies]
