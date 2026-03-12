@@ -42,6 +42,8 @@ pre-commit==4.5.1
     # via open-llm-vtuber (pyproject.toml)
 pydub==0.25.1
     # via open-llm-vtuber (pyproject.toml)
+pyncm==1.8.1
+    # via open-llm-vtuber (pyproject.toml)
 pysbd==0.3.4
     # via open-llm-vtuber (pyproject.toml)
 pyttsx3==2.99
@@ -71,4 +73,6 @@ tqdm==4.67.1
 uvicorn==0.40.0
     # via open-llm-vtuber (pyproject.toml)
 websocket-client==1.9.0
+    # via open-llm-vtuber (pyproject.toml)
+yt-dlp==2026.3.3
     # via open-llm-vtuber (pyproject.toml)
